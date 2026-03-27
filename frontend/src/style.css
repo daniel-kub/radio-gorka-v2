@@ -1,0 +1,126 @@
+@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=VT323&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --color-retro-bg: #0d0d2b;
+  --color-retro-bg-secondary: #1a1a2e;
+  --color-retro-pink: #FF1493;
+  --color-retro-pink-light: #FF69B4;
+  --color-retro-green: #39FF14;
+  --color-retro-green-dark: #00FF00;
+  --color-retro-cyan: #00FFFF;
+  --color-retro-gold: #FFD700;
+  --color-retro-silver: #C0C0C0;
+  --color-retro-bronze: #964B00;
+
+  --font-pixel: 'VT323', monospace;
+  --font-orbitron: 'Orbitron', sans-serif;
+}
+
+@layer base {
+  :root {
+    --color-bg: #0d0d2b;
+    --color-bg-secondary: #1a1a2e;
+    --color-text: #FF1493;
+    --color-accent: #39FF14;
+  }
+
+  html {
+    color-scheme: dark;
+  }
+
+  body {
+    font-family: 'VT323', monospace;
+    background-color: #0d0d2b;
+    color: #FF1493;
+    padding: 15px;
+    margin: 0;
+  }
+}
+
+@keyframes neon-pulse {
+  0%, 100% { 
+    box-shadow: 0 0 5px #39FF14, 0 0 10px #39FF14, 0 0 20px #39FF14;
+  }
+  50% { 
+    box-shadow: 0 0 10px #39FF14, 0 0 20px #39FF14, 0 0 40px #39FF14;
+  }
+}
+
+@keyframes neon-flicker {
+  0%, 19%, 21%, 23%, 25%, 54%, 56%, 100% {
+    text-shadow: 
+      0 0 4px #39FF14,
+      0 0 11px #39FF14,
+      0 0 19px #39FF14,
+      0 0 40px #39FF14;
+  }
+  20%, 24%, 55% {
+    text-shadow: none;
+  }
+}
+
+@utility neon-text {
+  color: #39FF14;
+  font-family: 'Orbitron', sans-serif;
+  text-shadow: 
+    0 0 4px #39FF14,
+    0 0 11px #39FF14,
+    0 0 19px #39FF14;
+}
+
+@utility neon-box {
+  background-color: #1a1a2e;
+  border: 2px solid #FF1493;
+  box-shadow: 0 0 5px #FF1493, 0 0 10px #FF1493;
+}
+
+@utility neon-box-accent {
+  background-color: #1a1a2e;
+  border: 2px solid #39FF14;
+  box-shadow: 0 0 5px #39FF14, 0 0 10px #39FF14;
+}
+
+@utility retro-input {
+  padding: 6px;
+  border: 1px solid #FF1493;
+  background-color: #1a1a2e;
+  color: #FF1493;
+  font-family: 'VT323', monospace;
+  font-size: 1.2em;
+  width: 88%;
+}
+
+@utility retro-button {
+  padding: 9px 13px;
+  border: 1px solid #FF1493;
+  background-color: #1a1a2e;
+  color: #FF1493;
+  font-family: 'Orbitron', sans-serif;
+  font-size: 0.9em;
+  cursor: pointer;
+  transition: 0.2s ease;
+}
+
+.retro-button:hover {
+  background-color: #FF1493;
+  color: #FFFFFF;
+  transform: scale(1.05);
+}
+
+@utility retro-button-green {
+  padding: 9px 13px;
+  border: 1px solid #39FF14;
+  background-color: #1a1a2e;
+  color: #39FF14;
+  font-family: 'Orbitron', sans-serif;
+  font-size: 0.9em;
+  cursor: pointer;
+  transition: 0.2s ease;
+}
+
+.retro-button-green:hover {
+  background-color: #39FF14;
+  color: #0d0d2b;
+  transform: scale(1.05);
+}
