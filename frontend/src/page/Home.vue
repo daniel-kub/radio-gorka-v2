@@ -90,12 +90,14 @@
     </div>
 
     <p class="mt-6" style="color: #FF1493;">© Radio Górka</p>
+    <GitHubButton href="https://github.com/daniel-kub/radio-gorka-v2" />
   </div>
 </template>
 
 <script setup>
 import { ref } from "vue";
 import axios from "axios";
+import GitHubButton from "./GitHubButton.vue";
 
 const eventMode = import.meta.env.VITE_EVENT_MODE === 'true'
 

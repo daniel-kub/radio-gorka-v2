@@ -126,7 +126,7 @@
         <p v-if="loginError" class="mt-4 text-center" style="color: #FF1493;">
           {{ loginError }}
         </p>
-      </div>-->
+      </div>
     
     </div>
     
