@@ -7,7 +7,16 @@ from dotenv import load_dotenv
 load_dotenv()
 
 def get_connection():
-    return pymysql.connect(os.getenv("domain"),os.getenv("username"),os.getenv("password"), os.getenv("database"), port=os.getenv("port"))
+    return pymysql.connect(
+        host=os.getenv("domain"),
+        user=os.getenv("username"),
+        password=os.getenv("password"),
+        database=os.getenv("database"),
+        port=int(os.getenv("port", 3306))
+    )
+    
+
+
 
 def login(username, password):
     conn = get_connection()

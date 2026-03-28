@@ -124,8 +124,8 @@ const search = async () => {
   results.value = [];
   
   try {
-    const response = await axios.get("/api/search?query=" + query.value);
-    results.value = response.data.results;
+    const response = await axios.get("https://frog02-20689.wykr.es/api/search?query=" + query.value);
+    results.value = response.data.results.filter(item => item.videoId != null); // <-- dodaj to
   } catch (error) {
     console.error(error);
     showNotification('Błąd podczas wyszukiwania', 'error');
@@ -136,7 +136,7 @@ const search = async () => {
 
 const add = async (item) => {
   try {
-    await axios.get("/api/event/add?videoID=" + item.videoId);
+    await axios.get("https://frog02-20689.wykr.es/api/event/add?videoID=" + item.videoId);
     showNotification(`Dodano: ${item.title}`, 'success');
     results.value = results.value.filter(r => r.videoId !== item.videoId);
   } catch (error) {

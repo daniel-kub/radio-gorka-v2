@@ -71,6 +71,51 @@
               </li>
             </ul>
           </div>
+          <div v-if="eventResults.length > 0 && eventMode">
+            <h3 class="text-xl font-bold mb-4" style="color: #FF1493; font-family: 'Orbitron', sans-serif;">Propozycje eventowe</h3>
+            <ul class="flex flex-col gap-4">
+              <li
+                v-for="(item, index) in eventResults"
+                :key="item.videoID"
+                class="neon-box rounded-lg p-4 flex flex-col sm:flex-row items-center gap-4 hover:scale-[1.02] transition-transform cursor-pointer"
+                style="border: 2px solid #FF1493;"
+              >
+                <a :href="'https://www.youtube.com/watch?v=' + item.videoID" target="_blank" class="shrink-0">
+                  <img
+                    :src="'https://img.youtube.com/vi/' + item.videoID + '/default.jpg'"
+                    :alt="item.title"
+                    class="w-24 h-24 sm:w-16 sm:h-16 rounded-lg object-cover"
+                    style="box-shadow: 0px 0px 10px 2px #FF1493;"
+                  />
+                </a>
+                <div class="flex-1 min-w-0 text-center sm:text-left">
+                  <a :href="'https://www.youtube.com/watch?v=' + item.videoID" target="_blank" class="font-semibold truncate hover:underline block" style="color: #FF1493; font-family: 'Orbitron', sans-serif;">{{ item.title }}</a>
+                  <p style="color: #39FF14;">{{ item.artist }}</p>
+                  <p class="text-xs" style="color: #FF1493;">{{ item.videoID }}</p>
+                </div>
+                <div class="flex gap-2 w-full sm:w-auto">
+                  <button
+                    @click="accept(item, 'event')"
+                    class="retro-button-green rounded-lg px-3 py-2 shadow-lg flex items-center justify-center gap-1 flex-1 sm:flex-none text-sm"
+                  >
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                    </svg>
+                    Akceptuj
+                  </button>
+                  <button
+                    @click="reject(item, 'event')"
+                    class="retro-button rounded-lg px-3 py-2 shadow-lg flex items-center justify-center gap-1 flex-1 sm:flex-none text-sm"
+                  >
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                    </svg>
+                    Odrzuć
+                  </button>
+                </div>
+              </li>
+            </ul>
+          </div>
         </div>
       </div>
     </div>
@@ -137,6 +182,8 @@
 import { ref, onMounted } from 'vue';
 import axios from 'axios';
 
+const eventMode = import.meta.env.VITE_EVENT_MODE === 'true'
+
 const logged = ref(!!localStorage.getItem('token'));
 const username = ref('');
 const password = ref('');
@@ -198,7 +245,7 @@ const handleLogout = () => {
 };
 
 const accept = async (item, type) => {
-  const endpoint = type === 'event' ? '/api/event/accept' : 'https://frog02-20689.wykr.es/api/accept';
+  const endpoint = type === 'event' ? 'https://frog02-20689.wykr.es/api/event/accept' : 'https://frog02-20689.wykr.es/api/accept';
   try {
     await axios.get(endpoint + "?token=" + localStorage.token + "&videoID=" + item.videoID);
     if (type === 'event') {
@@ -215,7 +262,7 @@ const reject = async (item, type) => {
   const reason = prompt("Podaj przyczynę odrzucenia:");
   if (reason === null) return;
   
-  const endpoint = type === 'event' ? '/api/event/decline' : 'https://frog02-20689.wykr.es/api/decline';
+  const endpoint = type === 'event' ? 'https://frog02-20689.wykr.es/api/event/decline' : 'https://frog02-20689.wykr.es/api/decline';
   try {
     await axios.get(endpoint + "?token=" + localStorage.token + "&videoID=" + item.videoID + "&reason=" + encodeURIComponent(reason));
     if (type === 'event') {

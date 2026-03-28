@@ -129,7 +129,7 @@ const search = async () => {
   
   try {
     const response = await axios.get("https://frog02-20689.wykr.es/api/search?query=" + query.value);
-    results.value = response.data.results;
+    results.value = response.data.results.filter(item => item.videoId != null); // <-- dodaj to
   } catch (error) {
     console.error(error);
     showNotification('Błąd podczas wyszukiwania', 'error');

@@ -1,5 +1,6 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from ytmusicapi import YTMusic
 import pymysql
 import auth
@@ -38,7 +39,7 @@ def get_event_connection():
         host=os.getenv("domain"),
         user=os.getenv("username"),
         password=os.getenv("password"),
-        database=os.getenv("database_event"),
+        database=os.getenv("database"),
         port=int(os.getenv("port", 3306))
     )
 
@@ -58,27 +59,36 @@ async def search(query: str):
 
 @app.get("/api/add")
 async def add(videoID: str):
+    try:
+        song = yt.get_song(videoID)
+        if not song or not song.get("videoDetails"):
+            raise HTTPException(status_code=404, detail="Nie znaleziono piosenki o podanym ID")
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Nieprawidłowe ID: {str(e)}")
+
     conn = get_connection()
     try:
-        cursor = conn.cursor(as_dict=True)
-        
+        cursor = conn.cursor()
+
         cursor.execute("SELECT status, reason FROM tracks WHERE videoID = %s", (videoID,))
         row = cursor.fetchone()
-        
+
         if row is None:
             cursor.execute("INSERT INTO tracks (videoID, status) VALUES (%s, 'check')", (videoID,))
             conn.commit()
-            return {"result": "inserted", "message": "Piosenka dodana do sprawdzenia"}
-        
-        status = row["status"]
-        
+            return JSONResponse(status_code=201, content={"result": "inserted", "message": "Piosenka dodana do sprawdzenia"})
+
+        status = row[0]
+
         if status == "check":
             raise HTTPException(status_code=409, detail="Piosenka jest już oczekująca na sprawdzenie")
         elif status == "accepted":
             raise HTTPException(status_code=409, detail="Piosenka została już zaakceptowana")
         elif status == "declined":
-            reason = row.get("reason") or ""
-            raise HTTPException(status_code=403, detail=f"Piosenka została odrzucona: {reason}")
+            reason = row[1]
+            raise HTTPException(status_code=403, detail=f"Piosenka została odrzucona z powodu: {reason}")
 
     except HTTPException:
         raise
@@ -87,35 +97,6 @@ async def add(videoID: str):
     finally:
         conn.close()
 
-async def add_event(videoID: str):
-    conn = get_event_connection()
-    try:
-        cursor = conn.cursor(as_dict=True)
-        
-        cursor.execute("SELECT status, reason FROM tracks_event WHERE videoID = %s", (videoID,))
-        row = cursor.fetchone()
-        
-        if row is None:
-            cursor.execute("INSERT INTO tracks_event (videoID, status) VALUES (%s, 'check')", (videoID,))
-            conn.commit()
-            return {"result": "inserted", "message": "Piosenka eventowa dodana do sprawdzenia"}
-        
-        status = row["status"]
-        
-        if status == "check":
-            raise HTTPException(status_code=409, detail="Piosenka eventowa jest już oczekująca na sprawdzenie")
-        elif status == "accepted":
-            raise HTTPException(status_code=409, detail="Piosenka eventowa została już zaakceptowana")
-        elif status == "declined":
-            reason = row.get("reason") or ""
-            raise HTTPException(status_code=403, detail=f"Piosenka eventowa została odrzucona: {reason}")
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-    finally:
-        conn.close()
 
 @app.post("/api/login")
 async def login(data: LoginData):
@@ -132,7 +113,7 @@ async def list(token: str):
 
     conn = get_connection()
     try:
-        cursor = conn.cursor(as_dict=True)
+        cursor = conn.cursor()
         cursor.execute("SELECT * FROM tracks WHERE status='check'")
         rows = cursor.fetchall()
     except Exception as e:
@@ -142,14 +123,14 @@ async def list(token: str):
 
     result = []
     for row in rows:
-        videoID = row["videoID"]
+        videoID = row[1]
         try:
             song = yt.get_song(videoID)
             details = song.get("videoDetails", {})
             result.append({
                 "videoID": videoID,
-                "status": row["status"],
-                "reason": row["reason"],
+                "status": row[2],
+                "reason": row[3],
                 "title": details.get("title"),
                 "author": details.get("author"),
                 "lengthSeconds": details.get("lengthSeconds"),
@@ -180,8 +161,6 @@ async def accept(token: str, videoID: str):
 
     try:
         song = yt.get_song(videoID)
-        if not song or not song.get("videoDetails"):
-            raise HTTPException(status_code=404, detail="Nie znaleziono piosenki o podanym ID")
         yt.add_playlist_items("PLJhSTAItRjxJl8f9mcHenCKVotPkSDFVB", [videoID])
     except HTTPException:
         raise
@@ -190,10 +169,10 @@ async def accept(token: str, videoID: str):
 
     conn = get_connection()
     try:
-        cursor = conn.cursor(as_dict=True)
+        cursor = conn.cursor()
         cursor.execute("UPDATE tracks SET status='accepted' WHERE videoID=%s", (videoID,))
         conn.commit()
-        return {"message": f"Pomyślnie zaakceptowano i dodano {videoID}"}
+        return JSONResponse(status_code=204, content={"message": f"Pomyślnie zaakceptowano i dodano {videoID}"})
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
     finally:
@@ -207,10 +186,10 @@ async def decline(token: str, videoID: str, reason: str):
 
     conn = get_connection()
     try:
-        cursor = conn.cursor(as_dict=True)
+        cursor = conn.cursor()
         cursor.execute("UPDATE tracks SET status='declined', reason=%s WHERE videoID=%s", (reason, videoID))
         conn.commit()
-        return {"message": f"Pomyślnie odrzucono {videoID}"}
+        return JSONResponse(status_code=204, content={"message": f"Pomyślnie odrzucono {videoID}"})
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
     finally:
@@ -229,22 +208,25 @@ async def event_add(videoID: str):
 
     conn = get_event_connection()
     try:
-        cursor = conn.cursor(as_dict=True)
-        cursor.execute("EXEC dbo.add_music_event @videoID=%s", (videoID,))
+        cursor = conn.cursor()
+
+        cursor.execute("SELECT status, reason FROM tracks_event WHERE videoID = %s", (videoID,))
         row = cursor.fetchone()
-        conn.commit()
 
-        status = row["result"]
-        message = row["message"]
+        if row is None:
+            cursor.execute("INSERT INTO tracks_event (videoID, status) VALUES (%s, 'check')", (videoID,))
+            conn.commit()
+            return JSONResponse(status_code=201, content={"result": "inserted", "message": "Piosenka dodana do sprawdzenia"})
 
-        if status == "inserted":
-            return {"result": status, "message": message}
-        elif status == "check":
-            raise HTTPException(status_code=409, detail=message)
+        status = row[0]
+
+        if status == "check":
+            raise HTTPException(status_code=409, detail="Piosenka jest już oczekująca na sprawdzenie")
         elif status == "accepted":
-            raise HTTPException(status_code=409, detail=message)
+            raise HTTPException(status_code=409, detail="Piosenka została już zaakceptowana")
         elif status == "declined":
-            raise HTTPException(status_code=403, detail=message)
+            reason = row[1] or ""
+            raise HTTPException(status_code=403, detail=f"Piosenka została odrzucona z powodu: {reason}")
 
     except HTTPException:
         raise
@@ -261,7 +243,7 @@ async def event_list(token: str):
 
     conn = get_event_connection()
     try:
-        cursor = conn.cursor(as_dict=True)
+        cursor = conn.cursor()
         cursor.execute("SELECT * FROM tracks_event WHERE status='check'")
         rows = cursor.fetchall()
     except Exception as e:
@@ -271,14 +253,14 @@ async def event_list(token: str):
 
     result = []
     for row in rows:
-        videoID = row["videoID"]
+        videoID = row[1]
         try:
             song = yt.get_song(videoID)
             details = song.get("videoDetails", {})
             result.append({
                 "videoID": videoID,
-                "status": row["status"],
-                "reason": row["reason"],
+                "status": row[2],
+                "reason": row[3],
                 "title": details.get("title"),
                 "author": details.get("author"),
                 "lengthSeconds": details.get("lengthSeconds"),
@@ -320,15 +302,14 @@ async def event_accept(token: str, videoID: str):
 
     conn = get_event_connection()
     try:
-        cursor = conn.cursor(as_dict=True)
+        cursor = conn.cursor()
         cursor.execute("UPDATE tracks_event SET status='accepted' WHERE videoID=%s", (videoID,))
         conn.commit()
-        return {"message": f"Pomyślnie zaakceptowano i dodano {videoID}"}
+        return JSONResponse(status_code=204, content={"message": f"Pomyślnie zaakceptowano i dodano {videoID}"})
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
     finally:
         conn.close()
-
 
 
 @app.get("/api/event/decline")
@@ -339,10 +320,10 @@ async def event_decline(token: str, videoID: str, reason: str):
 
     conn = get_event_connection()
     try:
-        cursor = conn.cursor(as_dict=True)
+        cursor = conn.cursor()
         cursor.execute("UPDATE tracks_event SET status='declined', reason=%s WHERE videoID=%s", (reason, videoID))
         conn.commit()
-        return {"message": f"Pomyślnie odrzucono {videoID}"}
+        return JSONResponse(status_code=204, content={"message": f"Pomyślnie odrzucono {videoID}"})
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
     finally:
