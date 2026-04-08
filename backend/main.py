@@ -34,15 +34,6 @@ def get_connection():
         port=int(os.getenv("port", 3306))
     )
 
-def get_event_connection():
-    return pymysql.connect(
-        host=os.getenv("domain"),
-        user=os.getenv("username"),
-        password=os.getenv("password"),
-        database=os.getenv("database"),
-        port=int(os.getenv("port", 3306))
-    )
-
 @app.get("/api/search")
 async def search(query: str):
     search_results = yt.search(query)
@@ -61,41 +52,13 @@ async def search(query: str):
 async def add(videoID: str):
     try:
         song = yt.get_song(videoID)
+        yt.add_playlist_items("PLJhSTAItRjxJl8f9mcHenCKVotPkSDFVB", [videoID])
         if not song or not song.get("videoDetails"):
             raise HTTPException(status_code=404, detail="Nie znaleziono piosenki o podanym ID")
     except HTTPException:
         raise
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Nieprawidłowe ID: {str(e)}")
-
-    conn = get_connection()
-    try:
-        cursor = conn.cursor()
-
-        cursor.execute("SELECT status, reason FROM tracks WHERE videoID = %s", (videoID,))
-        row = cursor.fetchone()
-
-        if row is None:
-            cursor.execute("INSERT INTO tracks (videoID, status) VALUES (%s, 'check')", (videoID,))
-            conn.commit()
-            return JSONResponse(status_code=201, content={"result": "inserted", "message": "Piosenka dodana do sprawdzenia"})
-
-        status = row[0]
-
-        if status == "check":
-            raise HTTPException(status_code=409, detail="Piosenka jest już oczekująca na sprawdzenie")
-        elif status == "accepted":
-            raise HTTPException(status_code=409, detail="Piosenka została już zaakceptowana")
-        elif status == "declined":
-            reason = row[1]
-            raise HTTPException(status_code=403, detail=f"Piosenka została odrzucona z powodu: {reason}")
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-    finally:
-        conn.close()
 
 
 @app.post("/api/login")
@@ -105,232 +68,92 @@ async def login(data: LoginData):
         raise HTTPException(status_code=401, detail="Błędny login lub hasło")
     return {"token": login_status}
 
+
 @app.get("/api/list")
 async def list(token: str):
     is_auth = auth.auth(token)
     if not is_auth:
         raise HTTPException(status_code=401, detail="Klucz JWT niepoprawny")
 
-    conn = get_connection()
+    PLAYLIST_ID = "PLJhSTAItRjxJl8f9mcHenCKVotPkSDFVB"
     try:
-        cursor = conn.cursor()
-        cursor.execute("SELECT * FROM tracks WHERE status='check'")
-        rows = cursor.fetchall()
+        playlist = yt.get_playlist(PLAYLIST_ID, limit=None)
+        playlist_tracks = playlist.get("tracks", [])
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-    finally:
-        conn.close()
+        raise HTTPException(status_code=500, detail=f"Błąd pobierania playlisty: {str(e)}")
 
     result = []
-    for row in rows:
-        videoID = row[1]
-        try:
-            song = yt.get_song(videoID)
-            details = song.get("videoDetails", {})
-            result.append({
-                "videoID": videoID,
-                "status": row[2],
-                "reason": row[3],
-                "title": details.get("title"),
-                "author": details.get("author"),
-                "lengthSeconds": details.get("lengthSeconds"),
-                "viewCount": details.get("viewCount"),
-                "thumbnail": details.get("thumbnail", {}).get("thumbnails", [{}])[-1].get("url"),
-                "url": f"https://music.youtube.com/watch?v={videoID}"
-            })
-        except Exception:
-            result.append({
-                "videoID": videoID,
-                "status": row["status"],
-                "reason": row["reason"],
-                "title": None,
-                "author": None,
-                "lengthSeconds": None,
-                "viewCount": None,
-                "thumbnail": None,
-                "url": f"https://music.youtube.com/watch?v={videoID}"
-            })
-
-    return result
-
-@app.get("/api/accept")
-async def accept(token: str, videoID: str):
-    is_auth = auth.auth(token)
-    if not is_auth:
-        raise HTTPException(status_code=401, detail="Klucz JWT niepoprawny")
-
-    try:
-        song = yt.get_song(videoID)
-        yt.add_playlist_items("PLJhSTAItRjxJl8f9mcHenCKVotPkSDFVB", [videoID])
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Nieprawidłowe ID: {str(e)}")
-
-    conn = get_connection()
-    try:
-        cursor = conn.cursor()
-        cursor.execute("UPDATE tracks SET status='accepted' WHERE videoID=%s", (videoID,))
-        conn.commit()
-        return JSONResponse(status_code=204, content={"message": f"Pomyślnie zaakceptowano i dodano {videoID}"})
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-    finally:
-        conn.close()
-
-@app.get("/api/decline")
-async def decline(token: str, videoID: str, reason: str):
-    is_auth = auth.auth(token)
-    if not is_auth:
-        raise HTTPException(status_code=401, detail="Klucz JWT niepoprawny")
-
-    conn = get_connection()
-    try:
-        cursor = conn.cursor()
-        cursor.execute("UPDATE tracks SET status='declined', reason=%s WHERE videoID=%s", (reason, videoID))
-        conn.commit()
-        return JSONResponse(status_code=204, content={"message": f"Pomyślnie odrzucono {videoID}"})
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-    finally:
-        conn.close()
-
-@app.get("/api/event/add")
-async def event_add(videoID: str):
-    try:
-        song = yt.get_song(videoID)
-        if not song or not song.get("videoDetails"):
-            raise HTTPException(status_code=404, detail="Nie znaleziono piosenki o podanym ID")
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Nieprawidłowe ID: {str(e)}")
-
-    conn = get_event_connection()
-    try:
-        cursor = conn.cursor()
-
-        cursor.execute("SELECT status, reason FROM tracks_event WHERE videoID = %s", (videoID,))
-        row = cursor.fetchone()
-
-        if row is None:
-            cursor.execute("INSERT INTO tracks_event (videoID, status) VALUES (%s, 'check')", (videoID,))
-            conn.commit()
-            return JSONResponse(status_code=201, content={"result": "inserted", "message": "Piosenka dodana do sprawdzenia"})
-
-        status = row[0]
-
-        if status == "check":
-            raise HTTPException(status_code=409, detail="Piosenka jest już oczekująca na sprawdzenie")
-        elif status == "accepted":
-            raise HTTPException(status_code=409, detail="Piosenka została już zaakceptowana")
-        elif status == "declined":
-            reason = row[1] or ""
-            raise HTTPException(status_code=403, detail=f"Piosenka została odrzucona z powodu: {reason}")
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-    finally:
-        conn.close()
-
-@app.get("/api/event/list")
-async def event_list(token: str):
-    is_auth = auth.auth(token)
-    if not is_auth:
-        raise HTTPException(status_code=401, detail="Klucz JWT niepoprawny")
-
-    conn = get_event_connection()
-    try:
-        cursor = conn.cursor()
-        cursor.execute("SELECT * FROM tracks_event WHERE status='check'")
-        rows = cursor.fetchall()
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-    finally:
-        conn.close()
-
-    result = []
-    for row in rows:
-        videoID = row[1]
-        try:
-            song = yt.get_song(videoID)
-            details = song.get("videoDetails", {})
-            result.append({
-                "videoID": videoID,
-                "status": row[2],
-                "reason": row[3],
-                "title": details.get("title"),
-                "author": details.get("author"),
-                "lengthSeconds": details.get("lengthSeconds"),
-                "viewCount": details.get("viewCount"),
-                "thumbnail": details.get("thumbnail", {}).get("thumbnails", [{}])[-1].get("url"),
-                "url": f"https://music.youtube.com/watch?v={videoID}"
-            })
-        except Exception:
-            result.append({
-                "videoID": videoID,
-                "status": row["status"],
-                "reason": row["reason"],
-                "title": None,
-                "author": None,
-                "lengthSeconds": None,
-                "viewCount": None,
-                "thumbnail": None,
-                "url": f"https://music.youtube.com/watch?v={videoID}"
-            })
+    for track in playlist_tracks:
+        videoID = track.get("videoId")
+        thumbnails = track.get("thumbnails") or []
+        result.append({
+            "videoID": videoID,
+            "title": track.get("title"),
+            "author": ", ".join(
+                a["name"] for a in (track.get("artists") or [])
+            ),
+            "lengthSeconds": track.get("duration_seconds"),
+            "thumbnail": thumbnails[-1].get("url") if thumbnails else None,
+            "url": f"https://music.youtube.com/watch?v={videoID}"
+        })
 
     return result
 
 
-@app.get("/api/event/accept")
-async def event_accept(token: str, videoID: str):
+@app.get("/api/delete")
+async def decline(token: str, videoID: str):
     is_auth = auth.auth(token)
     if not is_auth:
         raise HTTPException(status_code=401, detail="Klucz JWT niepoprawny")
 
+    PLAYLIST_ID = "PLJhSTAItRjxJl8f9mcHenCKVotPkSDFVB"
+
+    # Pobierz playlistę żeby znaleźć setVideoId potrzebny do usunięcia
     try:
-        song = yt.get_song(videoID)
-        if not song or not song.get("videoDetails"):
-            raise HTTPException(status_code=404, detail="Nie znaleziono piosenki o podanym ID")
-        yt.add_playlist_items("PLJhSTAItRjxLS10EQ7dNbeUOPcnIW2m6r", [videoID])
-    except HTTPException:
-        raise
+        playlist = yt.get_playlist(PLAYLIST_ID, limit=None)
+        playlist_tracks = playlist.get("tracks", [])
     except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Nieprawidłowe ID: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Błąd pobierania playlisty: {str(e)}")
 
-    conn = get_event_connection()
+    # Znajdź utwór po videoId — get_playlist wymaga setVideoId do usunięcia
+    track = next(
+        (t for t in playlist_tracks if t.get("videoId") == videoID),
+        None
+    )
+
+    if not track:
+        raise HTTPException(status_code=404, detail="Nie znaleziono utworu w playliście")
+
+    set_video_id = track.get("setVideoId")
+    if not set_video_id:
+        raise HTTPException(status_code=500, detail="Brak setVideoId — nie można usunąć utworu")
+
     try:
-        cursor = conn.cursor()
-        cursor.execute("UPDATE tracks_event SET status='accepted' WHERE videoID=%s", (videoID,))
-        conn.commit()
-        return JSONResponse(status_code=204, content={"message": f"Pomyślnie zaakceptowano i dodano {videoID}"})
+        yt.remove_playlist_items(PLAYLIST_ID, [{"videoId": videoID, "setVideoId": set_video_id}])
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-    finally:
-        conn.close()
+        raise HTTPException(status_code=500, detail=f"Błąd usuwania z playlisty: {str(e)}")
 
-
-@app.get("/api/event/decline")
-async def event_decline(token: str, videoID: str, reason: str):
+    return {"success": True, "videoID": videoID}
+@app.delete("/api/clear-playlist")
+async def clear_playlist(token:str):
     is_auth = auth.auth(token)
     if not is_auth:
         raise HTTPException(status_code=401, detail="Klucz JWT niepoprawny")
 
-    conn = get_event_connection()
+    PLAYLIST_ID = "PLJhSTAItRjxJl8f9mcHenCKVotPkSDFVB"
     try:
-        cursor = conn.cursor()
-        cursor.execute("UPDATE tracks_event SET status='declined', reason=%s WHERE videoID=%s", (reason, videoID))
-        conn.commit()
-        return JSONResponse(status_code=204, content={"message": f"Pomyślnie odrzucono {videoID}"})
+        playlist = yt.get_playlist(PLAYLIST_ID, limit=None)
+        tracks = playlist.get("tracks", [])
+
+        if not tracks:
+            return {"message": "Playlista jest już pusta.", "removed": 0}
+
+        yt.remove_playlist_items(PLAYLIST_ID, tracks)
+
+        return {
+            "message": "Playlista została wyczyszczona.",
+            "removed": len(tracks)
+        }
+
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-    finally:
-        conn.close()
-
-@app.get("/api/status")
-async def get_status():
-    return {
-        "name": "Radio Górka"
-    }
