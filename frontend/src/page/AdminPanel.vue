@@ -319,8 +319,6 @@
 import { ref, computed, onMounted } from 'vue';
 import axios from 'axios';
 
-const eventMode = import.meta.env.VITE_EVENT_MODE === 'true'
-
 const logged = ref(!!localStorage.getItem('token'));
 const username = ref('');
 const password = ref('');
@@ -340,12 +338,6 @@ const showConfirmModal = ref(false);
 const allNormalSelected = computed(() =>
   results.value.length > 0 &&
   results.value.every(item => selectedItems.value.has('normal:' + item.videoID))
-);
-
-// Computed: czy wszystkie eventowe zaznaczone
-const allEventSelected = computed(() =>
-  eventResults.value.length > 0 &&
-  eventResults.value.every(item => selectedItems.value.has('event:' + item.videoID))
 );
 
 const toggleSelect = (item, type) => {
@@ -377,9 +369,7 @@ const deleteSelected = async () => {
     const promises = [];
     for (const key of selectedItems.value) {
       const [type, videoID] = key.split(':');
-      const endpoint = type === 'event'
-        ? 'https://frog02-20689.wykr.es/api/event/delete'
-        : 'https://frog02-20689.wykr.es/api/delete';
+      const endpoint = 'https://frog02-20689.wykr.es/api/delete';
       promises.push(
         axios.get(`${endpoint}?token=${localStorage.token}&videoID=${videoID}`)
           .then(() => ({ type, videoID }))
@@ -469,9 +459,7 @@ const handleLogout = () => {
 };
 
 const deleteItem = async (item, type) => {
-  const endpoint = type === 'event'
-    ? 'https://frog02-20689.wykr.es/api/event/delete'
-    : 'https://frog02-20689.wykr.es/api/delete';
+  const endpoint = 'https://frog02-20689.wykr.es/api/delete';
   try {
     await axios.get(endpoint + "?token=" + localStorage.token + "&videoID=" + item.videoID);
     // Odznacz jeśli był zaznaczony

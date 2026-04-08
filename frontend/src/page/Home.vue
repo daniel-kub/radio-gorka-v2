@@ -83,12 +83,6 @@
       </div>
     </div>
 
-    <div v-if="eventMode" class="mt-8">
-      <router-link to="/event" class="retro-button rounded-lg px-4 py-2" style="text-decoration: none;">
-        🪩 Przełącz na Dyskotekę
-      </router-link>
-    </div>
-
     <p class="mt-6" style="color: #FF1493;">© Radio Górka</p>
     <GitHubButton href="https://github.com/daniel-kub/radio-gorka-v2" />
   </div>
