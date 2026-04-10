@@ -7,9 +7,8 @@ System do zgłaszania utworów do playlisty YouTube Music. Użytkownicy wyszukuj
 
 ## Demo
 
-**Strona główna:** [radio-gorka.wykr.es](https://radio-gorka.wykr.es)
+**Strona główna:** [radiogorka.pl](https://radiogorka.pl)
 
-**Panel admina:** [radio-gorka.wykr.es/admin-panel](https://radio-gorka.wykr.es/admin-panel)
 
 **API docs:** [frog02-20689.wykr.es/docs](https://frog02-20689.wykr.es/docs)
 
